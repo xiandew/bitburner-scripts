@@ -5,8 +5,16 @@ export async function main(ns) {
 	var scriptHack = "hack.js";
 	var scriptsDep = ["math.js", "list-servers.js"];
 
-	var portCrackerNames = ["BruteSSH", "FTPCrack", "relaySMTP", "HTTPWorm", "SQLInject"];
-	var portCrackers = portCrackerNames.reduce((a, c) => (ns.fileExists(`${c}.exe`, "home") ? [c.toLocaleLowerCase()] : []).concat(a), []);
+	var portCrackers = [
+		"BruteSSH.exe",
+		"FTPCrack.exe",
+		"relaySMTP.exe",
+		"HTTPWorm.exe",
+		"SQLInject.exe"
+	].reduce((a, c) => {
+		a[c] = { loaded: ns.fileExists(c, "home") };
+		return a;
+	}, {});
 
 	for (var server of getAllServers(ns)) {
 		if (server == "home") {
@@ -25,10 +33,20 @@ export async function main(ns) {
 		await deployHackScript(server);
 	}
 
+	function getNumLoadedPortCrackers() {
+		return Object.keys(portCrackers).filter((e) => portCrackers[e].loaded).length;
+	}
+
 	async function deployHackScript(server) {
-		if (!ns.hasRootAccess(server) && portCrackers.length >= ns.getServerNumPortsRequired(server)) {
-			portCrackers.forEach(function (portCracker) {
-				ns[portCracker](server);
+		if (!ns.hasRootAccess(server) && getNumLoadedPortCrackers() >= ns.getServerNumPortsRequired(server)) {
+			Object.keys(portCrackers).forEach((e) => {
+				if (portCrackers[e].loaded) {
+					if (e === "BruteSSH.exe") ns.brutessh(server);
+					if (e === "FTPCrack.exe") ns.ftpcrack(server);
+					if (e === "relaySMTP.exe") ns.relaysmtp(server);
+					if (e === "HTTPWorm.exe") ns.httpworm(server);
+					if (e === "SQLInject.exe") ns.sqlinject(server);
+				}
 			});
 			ns.nuke(server);
 		}
@@ -46,15 +64,12 @@ export async function main(ns) {
 	}
 
 	while (true) {
-		var prevNumPortCrackers = portCrackers.length;
-		portCrackerNames.forEach(function (e) {
-			var portCracker = e.toLocaleLowerCase();
-			if (ns.fileExists(`${e}.exe`, "home") && portCrackers.indexOf(portCracker) < 0) {
-				portCrackers.push(portCracker);
-			}
+		var prevNumLoadedPortCrackers = getNumLoadedPortCrackers();
+		Object.keys(portCrackers).forEach(function (e) {
+			portCrackers[e].loaded = ns.fileExists(e, "home");
 		});
 
-		if (portCrackers.length > prevNumPortCrackers) {
+		if (getNumLoadedPortCrackers() > prevNumLoadedPortCrackers) {
 			for (var server of getAllServers(ns)) {
 				if (!ns.scriptRunning(scriptHack, server)) {
 					await deployHackScript(server);
