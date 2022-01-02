@@ -69,12 +69,17 @@ export async function main(ns) {
 			portCrackers[e].loaded = ns.fileExists(e, "home");
 		});
 
-		if (getNumLoadedPortCrackers() > prevNumLoadedPortCrackers) {
+		var currNumLoadedPortCrackers = getNumLoadedPortCrackers();
+		if (currNumLoadedPortCrackers > prevNumLoadedPortCrackers) {
 			for (var server of getAllServers(ns)) {
 				if (!ns.scriptRunning(scriptHack, server)) {
 					await deployHackScript(server);
 				}
 			}
+		}
+
+		if (currNumLoadedPortCrackers === Object.keys(portCrackers).length) {
+			break;
 		}
 
 		await ns.sleep(100);
