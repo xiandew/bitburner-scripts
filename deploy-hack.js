@@ -2,6 +2,9 @@ import { getAllServers } from "list-servers.js";
 
 /** @param {NS} ns **/
 export async function main(ns) {
+	ns.disableLog("sleep");
+	var killall = ns.args[0] == "killall";
+
 	var scriptHack = "hack.js";
 	var scriptsDep = ["math.js", "list-servers.js"];
 
@@ -29,7 +32,7 @@ export async function main(ns) {
 			continue;
 		}
 
-
+		if (killall) await ns.killall(server);
 		await deployHackScript(server);
 	}
 
@@ -38,6 +41,8 @@ export async function main(ns) {
 	}
 
 	async function deployHackScript(server) {
+		if (ns.scriptRunning(scriptHack, server)) return;
+
 		if (!ns.hasRootAccess(server) && getNumLoadedPortCrackers() >= ns.getServerNumPortsRequired(server)) {
 			Object.keys(portCrackers).forEach((e) => {
 				if (portCrackers[e].loaded) {
@@ -51,16 +56,16 @@ export async function main(ns) {
 			ns.nuke(server);
 		}
 
-		await ns.killall(server);
 		var serverMaxRam = ns.getServerMaxRam(server);
 		var scriptRam = ns.getScriptRam(scriptHack, server);
 		var numThreads = Math.floor(serverMaxRam / scriptRam);
 
-		for (var script of [scriptHack].concat(scriptsDep)) {
-			await ns.scp(script, server);
+		if (numThreads) {
+			for (var script of [scriptHack].concat(scriptsDep)) {
+				await ns.scp(script, server);
+			}
+			await ns.exec(scriptHack, server, numThreads);
 		}
-
-		if (numThreads) await ns.exec(scriptHack, server, numThreads);
 	}
 
 	while (true) {
@@ -72,9 +77,7 @@ export async function main(ns) {
 		var currNumLoadedPortCrackers = getNumLoadedPortCrackers();
 		if (currNumLoadedPortCrackers > prevNumLoadedPortCrackers) {
 			for (var server of getAllServers(ns)) {
-				if (!ns.scriptRunning(scriptHack, server)) {
-					await deployHackScript(server);
-				}
+				await deployHackScript(server);
 			}
 		}
 
