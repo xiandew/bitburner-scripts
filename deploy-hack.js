@@ -20,19 +20,6 @@ export async function main(ns) {
 	}, {});
 
 	for (var server of getAllServers(ns)) {
-		if (server == "home") {
-			var homeFreeRam = ns.getServerMaxRam(server) - ns.getServerUsedRam(server);
-			var scriptRam = ns.getScriptRam(scriptHack, server);
-			var numThreads = Math.floor(homeFreeRam / scriptRam);
-
-			if (numThreads) {
-				await ns.exec(scriptHack, server, numThreads);
-			}
-
-			continue;
-		}
-
-		if (killall) await ns.killall(server);
 		await deployHackScript(server);
 	}
 
@@ -41,8 +28,6 @@ export async function main(ns) {
 	}
 
 	async function deployHackScript(server) {
-		if (ns.scriptRunning(scriptHack, server)) return;
-
 		if (!ns.hasRootAccess(server) && getNumLoadedPortCrackers() >= ns.getServerNumPortsRequired(server)) {
 			Object.keys(portCrackers).forEach((e) => {
 				if (portCrackers[e].loaded) {
@@ -56,15 +41,23 @@ export async function main(ns) {
 			ns.nuke(server);
 		}
 
-		var serverMaxRam = ns.getServerMaxRam(server);
-		var scriptRam = ns.getScriptRam(scriptHack, server);
-		var numThreads = Math.floor(serverMaxRam / scriptRam);
+		if (ns.hasRootAccess(server)) {
+			if (killall) {
+				await ns.killall(server);
+			} else if (ns.scriptRunning(scriptHack, server)) {
+				return;
+			}
 
-		if (numThreads) {
 			for (var script of [scriptHack].concat(scriptsDep)) {
 				await ns.scp(script, server);
 			}
-			await ns.exec(scriptHack, server, numThreads);
+
+			var serverFreeRam = ns.getServerMaxRam(server) - ns.getServerUsedRam(server);
+			var scriptRam = ns.getScriptRam(scriptHack, server);
+			var numThreads = Math.floor(serverFreeRam / scriptRam);
+
+			if (numThreads) await ns.exec(scriptHack, server, numThreads);
+
 		}
 	}
 
